@@ -110,16 +110,21 @@ h1,h2,h3,.logo{font-family:'Outfit',sans-serif;}
 /* Mobile Toggle Button */
 .mobile-toggle {
     display: none;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    color: var(--text-2);
-    padding: 10px;
-    border-radius: 8px;
+    background: var(--grad);
+    border: none;
+    color: #fff;
+    padding: 12px;
+    border-radius: 12px;
     cursor: pointer;
     position: fixed;
-    top: 15px;
-    left: 15px;
+    top: 20px;
+    left: 20px;
     z-index: 1100;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+.mobile-toggle svg {
+    width: 24px;
+    height: 24px;
 }
 
 body.sidebar-open .sidebar {
