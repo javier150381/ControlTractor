@@ -630,6 +630,16 @@ function renderDeudoresTable() {
 function renderDeudoresPaymentsHistory() {
     ensureDeudoresDefaults();
     const rows = getFilteredDeudoresPayments();
+    
+    // Calcular totales
+    const total = rows.reduce((sum, p) => sum + toNumber(p.amount), 0);
+    const clients = new Set(rows.map(p => (p.client_name || '').trim()).filter(Boolean));
+    
+    // Mostrar en pantalla
+    if ($('deudores-collected-total')) $('deudores-collected-total').textContent = `$${total.toFixed(2)}`;
+    if ($('deudores-collected-count')) $('deudores-collected-count').textContent = rows.length;
+    if ($('deudores-clients-count')) $('deudores-clients-count').textContent = clients.size;
+
     const tbody = $('deudores-payments-body');
     if (!tbody) return;
     tbody.innerHTML = '';
