@@ -42,9 +42,12 @@
         <main class="main-content">
             <header class="top-bar">
                 <div class="welcome">
-                    <h1>Resumen de Operaciones</h1>
+                <h2 id="page-title">Dashboard</h2>
+                <div class="user-status-top">
                     <p id="current-date">Cargando fecha...</p>
+                    <span id="role-indicator" class="badge-role">Cargando...</span>
                 </div>
+            </div>
                 <div class="search-box">
                     <i data-lucide="search"></i>
                     <input type="text" id="client-filter" placeholder="Buscar por cliente...">

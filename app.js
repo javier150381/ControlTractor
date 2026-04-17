@@ -110,6 +110,11 @@ async function enterApp(username, userId, role, display) {
     $('user-avatar').textContent = display.charAt(0).toUpperCase();
     $('user-email-display').textContent = display;
     $('role-badge').textContent = role === 'admin' ? 'Administrador' : 'Operador';
+    
+    const indicator = $('role-indicator');
+    if (indicator) {
+        indicator.textContent = role === 'admin' ? 'Administrador' : 'Operador';
+    }
 
     $$('.admin-only').forEach(el => el.style.display = role === 'admin' ? '' : 'none');
 
