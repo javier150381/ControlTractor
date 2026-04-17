@@ -49,9 +49,7 @@ const STATE = {
     deudoresTo: null,
     dashboardFrom: null,
     dashboardTo: null,
-    activeClosure: null,
-    closureSchemaReady: null,
-    closureSchemaWarned: false
+    activeClosure: null
 };
 
 const $ = id => document.getElementById(id);
@@ -166,6 +164,9 @@ async function navigateTo(view) {
     $$('.nav-item').forEach(i => i.classList.remove('active'));
     const navEl = $(`nav-${view}`);
     if (navEl) navEl.classList.add('active');
+
+    // Cerrar sidebar en móvil
+    document.body.classList.remove('sidebar-open');
 
     $('page-title').textContent = PAGE_TITLES[view] || view;
     $('search-box').classList.toggle('hidden', view !== 'dashboard');
@@ -723,6 +724,96 @@ function renderSimpleTable(id, rows, fn) {
     rows.forEach(r => { const tr = document.createElement('tr'); tr.innerHTML = fn(r); b.appendChild(tr); });
 }
 
+// --- MONTHLY CLOSURE ---
+function getMonthBounds(monthStr) {
+    if (!monthStr || !/^\d{4}-\d{2}$/.test(monthStr)) return null;
+    const [yearRaw, monthRaw] = monthStr.split('-');
+    const year = parseInt(yearRaw, 10);
+    const month = parseInt(monthRaw, 10);
+    if (!year || !month || month < 1 || month > 12) return null;
+    const from = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const to = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    return { year, month, from, to };
+}
+
+function filterByFixedRange(rows, dateField, from, to) {
+    return rows.filter(row => {
+        let raw = row?.[dateField];
+        if (!raw) return false;
+        let val = String(raw).split('T')[0].split(' ')[0];
+        return (!from || val >= from) && (!to || val <= to);
+    });
+}
+
+function getClosureMonthValue() {
+    const el = $('closure-month');
+    if (!el) return null;
+    if (!el.value) el.value = todayISO().slice(0, 7);
+    return el.value;
+}
+
+function setClosureStatusBadge(statusText, tone = 'info') {
+    const badge = $('closure-status-badge');
+    if (!badge) return;
+    badge.textContent = statusText;
+    const colorMap = { success: 'var(--emerald)', warning: 'var(--amber)', error: 'var(--red)', info: 'var(--indigo)' };
+    badge.style.color = colorMap[tone] || 'var(--indigo)';
+}
+
+function setClosureCardValues(values) {
+    const set = (id, val) => { const el = $(id); if (el) el.textContent = `$${toNumber(val).toFixed(2)}`; };
+    set('closure-collected', values.cobrado_mes);
+    set('closure-expenses', values.gastos_mes);
+    set('closure-advances', values.adelantos_mes);
+    set('closure-base', values.base_comision || values.cobrado_mes);
+    set('closure-commission', values.comision_operador || (values.cobrado_mes * 0.20));
+    set('closure-balance', values.saldo_a_entregar_admin);
+}
+
+async function refreshMonthlyClosurePanel() {
+    const monthStr = getClosureMonthValue();
+    if (!monthStr) return;
+    const calc = computeMonthlyClosure(monthStr);
+    if (!calc) return;
+
+    const { data: existing } = await sb.from('monthly_closures').select('*').eq('operator_user_id', OPERATOR_USER_ID).eq('period_year', calc.year).eq('period_month', calc.month).maybeSingle();
+    
+    if (existing && existing.status === 'confirmado') {
+        setClosureCardValues(existing);
+        setClosureStatusBadge('CONFIRMADO', 'success');
+        $('closure-confirm-btn').disabled = true;
+    } else {
+        setClosureCardValues(calc);
+        setClosureStatusBadge('BORRADOR', 'info');
+        $('closure-confirm-btn').disabled = false;
+    }
+}
+
+function computeMonthlyClosure(monthStr) {
+    const b = getMonthBounds(monthStr);
+    if (!b) return null;
+    const p = filterByFixedRange(STATE.payments, 'payment_date', b.from, b.to).reduce((s,x)=>s+toNumber(x.amount),0);
+    const d = filterByFixedRange(STATE.diesel, 'purchase_date', b.from, b.to).reduce((s,x)=>s+toNumber(x.total_cost),0);
+    const a = filterByFixedRange(STATE.advances, 'advance_date', b.from, b.to).reduce((s,x)=>s+toNumber(x.amount),0);
+    const com = p * CLOSURE_COMMISSION_RATE;
+    return { ...b, cobrado_mes:p, gastos_mes:d, adelantos_mes:a, comision_operador:com, saldo_a_entregar_admin: p - d - com - a };
+}
+
+async function confirmMonthlyClosure() {
+    const monthStr = getClosureMonthValue();
+    const calc = computeMonthlyClosure(monthStr);
+    if (!calc) return;
+    const payload = {
+        operator_user_id: OPERATOR_USER_ID, period_year: calc.year, period_month: calc.month, period_start: calc.from, period_end: calc.to,
+        status: 'confirmado', cobrado_mes: calc.cobrado_mes, gastos_mes: calc.gastos_mes, adelantos_mes: calc.adelantos_mes,
+        base_comision: calc.cobrado_mes, comision_operador: calc.comision_operador, saldo_a_entregar_admin: calc.saldo_a_entregar_admin,
+        confirmed_at: new Date().toISOString()
+    };
+    const { error } = await sb.from('monthly_closures').upsert([payload]);
+    if (!error) { showNotification('Cierre confirmado', 'success'); refreshMonthlyClosurePanel(); }
+}
+
 // --- UTILS ---
 function todayISO() { return new Date().toISOString().split('T')[0]; }
 function toNumber(v) { return parseFloat(v) || 0; }
@@ -757,3 +848,7 @@ $$('.filter-tab').forEach(tab => {
     });
 });
 $('apply-range-btn')?.addEventListener('click', () => { STATE.reportFrom = $('range-from').value; STATE.reportTo = $('range-to').value; renderReport(); });
+
+$('closure-month')?.addEventListener('change', refreshMonthlyClosurePanel);
+$('closure-refresh-btn')?.addEventListener('click', refreshMonthlyClosurePanel);
+$('closure-confirm-btn')?.addEventListener('click', confirmMonthlyClosure);
