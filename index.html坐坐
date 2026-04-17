@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Tractores | Premium Management</title>
+    <meta name="description" content="Sistema de gestión y control de rentabilidad para servicios de tractor.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i data-lucide="tractor" class="logo-icon"></i>
+                <span>Tractor<span>Pro</span></span>
+            </div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-view="dashboard">
+                    <i data-lucide="layout-dashboard"></i> Dashboard
+                </a>
+                <a href="#" class="nav-item" data-view="entry">
+                    <i data-lucide="plus-circle"></i> Nueva Entrada
+                </a>
+                <a href="#" class="nav-item" id="export-btn">
+                    <i data-lucide="download"></i> Exportar CSV
+                </a>
+                <a href="#" class="nav-item" data-view="settings">
+                    <i data-lucide="settings"></i> Configuración
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <p>© 2024 ControlTractor</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="welcome">
+                    <h1>Resumen de Operaciones</h1>
+                    <p id="current-date">Cargando fecha...</p>
+                </div>
+                <div class="search-box">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="client-filter" placeholder="Buscar por cliente...">
+                </div>
+            </header>
+
+            <!-- Dashboard Stats -->
+            <section class="dashboard-grid">
+                <div class="stat-card revenue">
+                    <div class="stat-icon"><i data-lucide="dollar-sign"></i></div>
+                    <div class="stat-info">
+                        <h3>Ingresos Totales</h3>
+                        <p id="total-revenue">$0.00</p>
+                    </div>
+                </div>
+                <div class="stat-card cost">
+                    <div class="stat-icon"><i data-lucide="fuel"></i></div>
+                    <div class="stat-info">
+                        <h3>Costo Diésel</h3>
+                        <p id="total-diesel-cost">$0.00</p>
+                    </div>
+                </div>
+                <div class="stat-card profit">
+                    <div class="stat-icon"><i data-lucide="trending-up"></i></div>
+                    <div class="stat-info">
+                        <h3>Ganancia Neta</h3>
+                        <p id="total-profit">$0.00</p>
+                    </div>
+                </div>
+                <div class="stat-card hours">
+                    <div class="stat-icon"><i data-lucide="clock"></i></div>
+                    <div class="stat-info">
+                        <h3>Horas Totales</h3>
+                        <p id="total-hours">0.0 h</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Data Entry Form (Hidden by default or toggled) -->
+            <section id="entry-section" class="content-section hidden">
+                <div class="card form-card">
+                    <div class="card-header">
+                        <h2><i data-lucide="plus-circle"></i> Registrar Nuevo Trabajo</h2>
+                        <button class="close-btn" id="hide-entry-btn">&times;</button>
+                    </div>
+                    <form id="tractor-form">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="client">Nombre del Cliente</label>
+                                <input type="text" id="client" required placeholder="Ej: Hacienda La Esperanza">
+                            </div>
+                            <div class="form-group">
+                                <label for="hours">Horas Contratadas</label>
+                                <input type="number" id="hours" step="0.1" required placeholder="Ej: 2.5">
+                            </div>
+                            <div class="form-group">
+                                <label for="gallons">Galones de Diésel</label>
+                                <input type="number" id="gallons" step="0.1" required placeholder="Ej: 5.0">
+                            </div>
+                        </div>
+                        <button type="submit" class="primary-btn">Guardar Entrada</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section id="settings-section" class="content-section hidden">
+                <div class="card form-card">
+                    <div class="card-header">
+                        <h2><i data-lucide="settings"></i> Parámetros del Sistema</h2>
+                        <button class="close-btn" id="hide-settings-btn">&times;</button>
+                    </div>
+                    <form id="settings-form">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="rate-per-hour">Tarifa por Hora ($)</label>
+                                <input type="number" id="rate-per-hour" step="0.01" value="15.00">
+                            </div>
+                            <div class="form-group">
+                                <label for="diesel-price">Precio por Galón ($)</label>
+                                <input type="number" id="diesel-price" step="0.01" value="2.95">
+                            </div>
+                        </div>
+                        <button type="submit" class="primary-btn">Actualizar Parámetros</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Data Table -->
+            <section class="table-section">
+                <div class="card table-card">
+                    <div class="table-container">
+                        <table id="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Cliente</th>
+                                    <th>Horas</th>
+                                    <th>Ingreso</th>
+                                    <th>Diésel (Gal)</th>
+                                    <th>Costo Diésel</th>
+                                    <th>Ganancia</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body">
+                                <!-- Data injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notification-container"></div>
+
+    <script src="app.js"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>

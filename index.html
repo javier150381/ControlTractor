@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TractorPro System</title>
+    <meta name="description" content="Sistema de control de operaciones de tractor con gestión de ingresos, costos de diésel y reportes de rentabilidad.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===== LOGIN SCREEN ===== -->
+<div id="login-screen" class="login-overlay">
+    <div class="login-card">
+        <div class="login-logo">
+            <i data-lucide="tractor"></i>
+            <h1>Tractor<span>Pro</span></h1>
+        </div>
+        <p class="login-subtitle">Sistema de Control de Operaciones</p>
+        <form id="login-form" novalidate>
+            <div class="form-group">
+                <label for="login-email">Usuario</label>
+                <div class="input-wrapper">
+                    <i data-lucide="user"></i>
+                    <input type="text" id="login-email" placeholder="admin / operador" required autocomplete="username">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="login-password">Contraseña</label>
+                <div class="input-wrapper">
+                    <i data-lucide="lock"></i>
+                    <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+                    <button type="button" id="toggle-password" class="toggle-pwd-btn">
+                        <i data-lucide="eye"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="login-error" class="login-error hidden"></div>
+            <button type="submit" class="primary-btn full-width" id="login-btn">
+                <span>Iniciar Sesión</span>
+                <i data-lucide="log-in"></i>
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- ===== IMPORT MODAL ===== -->
+<div id="import-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+        <div class="modal-icon"><i data-lucide="database"></i></div>
+        <h2>Datos históricos detectados</h2>
+        <p>Se encontraron <strong id="import-count">0</strong> registros locales. ¿Deseas importarlos a Supabase?</p>
+        <div class="modal-actions">
+            <button id="confirm-import-btn" class="primary-btn">Importar Datos</button>
+            <button id="skip-import-btn" class="secondary-btn">Omitir</button>
+        </div>
+        <div id="import-progress" class="hidden">
+            <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+            <p id="import-status-text">Importando...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ===== MAIN APP ===== -->
+<div id="app" class="app-container hidden">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="logo">
+            <i data-lucide="tractor" class="logo-icon"></i>
+            <span>Tractor<span>Pro</span></span>
+        </div>
+
+        <nav class="nav-menu">
+            <a href="#" class="nav-item active" data-view="dashboard" id="nav-dashboard">
+                <i data-lucide="layout-dashboard"></i> <span>Dashboard</span>
+            </a>
+            <a href="#" class="nav-item operator-only" data-view="jobs" id="nav-jobs">
+                <i data-lucide="plus-circle"></i> <span>Nuevo Trabajo</span>
+            </a>
+            <a href="#" class="nav-item operator-only" data-view="diesel" id="nav-diesel">
+                <i data-lucide="fuel"></i> <span>Compra de Diésel</span>
+            </a>
+            <!-- Solo Admin -->
+            <a href="#" class="nav-item admin-only hidden" data-view="clients" id="nav-clients">
+                <i data-lucide="users"></i> <span>Clientes</span>
+            </a>
+            <a href="#" class="nav-item admin-only" data-view="reports" id="nav-reports">
+                <i data-lucide="bar-chart-2"></i> <span>Reportes</span>
+            </a>
+            <a href="#" class="nav-item admin-only" data-view="closure" id="nav-closure">
+                <i data-lucide="calendar-check-2"></i> <span>Cierre de Caja</span>
+            </a>
+            <a href="#" class="nav-item operator-only" data-view="deudores" id="nav-deudores">
+                <i data-lucide="alert-circle"></i> <span>Cobros / Deudas</span>
+            </a>
+            <a href="#" class="nav-item" data-view="adelantos" id="nav-adelantos">
+                <i data-lucide="hand-coins"></i> <span>Entregas al Admin</span>
+            </a>
+            <div class="nav-divider admin-only"></div>
+            <a href="#" class="nav-item admin-only" data-view="settings" id="nav-settings">
+                <i data-lucide="settings"></i> <span>Configuración</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-bottom">
+            <div class="user-info">
+                <div class="user-avatar" id="user-avatar">?</div>
+                <div class="user-details">
+                    <span id="user-email-display">—</span>
+                    <span class="role-badge" id="role-badge">—</span>
+                </div>
+            </div>
+            <button id="logout-btn" class="logout-btn" title="Cerrar Sesión">
+                <i data-lucide="log-out"></i>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="top-bar">
+            <div class="welcome">
+                <h2 id="page-title">Dashboard</h2>
+                <p id="current-date"></p>
+            </div>
+            <div class="search-box" id="search-box">
+                <div class="custom-range" style="display:flex;gap:.5rem;align-items:flex-end;">
+                    <div class="form-group" style="min-width:140px;">
+                        <label>Desde</label>
+                        <input type="date" id="dash-range-from">
+                    </div>
+                    <div class="form-group" style="min-width:140px;">
+                        <label>Hasta</label>
+                        <input type="date" id="dash-range-to">
+                    </div>
+                    <button id="dash-range-apply" class="primary-btn small" type="button">Filtrar</button>
+                    <button id="dash-range-clear" class="secondary-btn small" type="button">Limpiar</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- ===== DASHBOARD VIEW ===== -->
+        <section id="view-dashboard" class="view">
+            <div class="dashboard-grid">
+                <div class="stat-card revenue">
+                    <div class="stat-icon"><i data-lucide="dollar-sign"></i></div>
+                    <div class="stat-info"><h3>Ingresos Totales</h3><p id="total-revenue">$0.00</p></div>
+                </div>
+                <div class="stat-card cost">
+                    <div class="stat-icon"><i data-lucide="fuel"></i></div>
+                    <div class="stat-info"><h3>Costo Diésel</h3><p id="total-diesel-cost">$0.00</p></div>
+                </div>
+                <div class="stat-card profit">
+                    <div class="stat-icon"><i data-lucide="trending-up"></i></div>
+                    <div class="stat-info"><h3>Ganancia Neta</h3><p id="total-profit">$0.00</p></div>
+                </div>
+                <div class="stat-card hours">
+                    <div class="stat-icon"><i data-lucide="clock"></i></div>
+                    <div class="stat-info"><h3>Horas Trabajadas</h3><p id="total-hours">0.0 h</p></div>
+                </div>
+            </div>
+
+            <div class="card table-card">
+                <div class="card-header">
+                    <h3 id="entries-title">Registros de Trabajo</h3>
+                    <button class="secondary-btn small" id="export-dashboard-btn">
+                        <i data-lucide="download"></i> <span>Exportar CSV</span>
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table id="jobs-table">
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Fecha</th>
+                                <th>Descripción</th>
+                                <th>Horas</th>
+                                <th>Total</th>
+                                <th>Pagado</th>
+                                <th>Saldo</th>
+                                <th>Estado</th>
+                                <th class="admin-only">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobs-table-body"></tbody>
+                    </table>
+                    <p id="jobs-empty" class="empty-msg hidden">No hay registros de trabajo.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== JOB FORM VIEW ===== -->
+        <section id="view-jobs" class="view hidden">
+            <div class="card form-card">
+                <div class="card-header">
+                    <h3 id="job-form-title"><i data-lucide="plus-circle"></i> Registrar Trabajo</h3>
+                </div>
+                <form id="job-form" novalidate>
+                    <input type="hidden" id="job-id">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="job-client">Cliente *</label>
+                            <input type="text" id="job-client" list="client-datalist" required placeholder="Nombre del cliente">
+                            <datalist id="client-datalist"></datalist>
+                            <span class="field-error" id="err-client"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="job-date">Fecha del Trabajo *</label>
+                            <input type="date" id="job-date" required>
+                            <span class="field-error" id="err-date"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="job-hours">Horas Trabajadas *</label>
+                            <input type="number" id="job-hours" min="0.1" step="0.1" required placeholder="Ej: 2.5">
+                            <span class="field-error" id="err-hours"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="job-desc">Descripción</label>
+                            <input type="text" id="job-desc" placeholder="Tarea realizada (opcional)">
+                        </div>
+                        <div class="form-group">
+                            <label for="job-paid">Abono Inicial ($)</label>
+                            <input type="number" id="job-paid" min="0" step="0.01" value="0" placeholder="0.00">
+                            <span class="field-error" id="err-paid"></span>
+                        </div>
+                    </div>
+                    <div class="calc-preview" id="calc-preview">
+                        Ingreso estimado: <strong id="preview-revenue">$0.00</strong>
+                        (tarifa: <span id="preview-rate">$15.00</span>/h)
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="primary-btn" id="job-submit-btn">
+                            <i data-lucide="save"></i> Guardar Trabajo
+                        </button>
+                        <button type="button" class="secondary-btn" id="job-cancel-btn">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- ===== DIESEL FORM VIEW ===== -->
+        <section id="view-diesel" class="view hidden">
+            <div class="card form-card">
+                <div class="card-header">
+                    <h3 id="diesel-form-title"><i data-lucide="fuel"></i> Registrar Compra de Diésel</h3>
+                </div>
+                <form id="diesel-form" novalidate>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="diesel-date">Fecha de Compra *</label>
+                            <input type="date" id="diesel-date" required>
+                            <span class="field-error" id="err-diesel-date"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="diesel-gallons">Galones Comprados *</label>
+                            <input type="number" id="diesel-gallons" min="0.1" step="0.1" required placeholder="Ej: 20.0">
+                            <span class="field-error" id="err-diesel-gallons"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="diesel-price">Precio por Galón ($) *</label>
+                            <input type="number" id="diesel-price" min="0.01" step="0.01" required placeholder="Ej: 2.95">
+                            <span class="field-error" id="err-diesel-price"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="diesel-notes">Notas</label>
+                            <input type="text" id="diesel-notes" placeholder="Proveedor, etc. (opcional)">
+                        </div>
+                    </div>
+                    <div class="calc-preview" id="diesel-calc-preview">
+                        Costo estimado: <strong id="preview-diesel-cost">$0.00</strong>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="primary-btn" id="diesel-submit-btn">
+                            <i data-lucide="save"></i> Registrar Compra
+                        </button>
+                        <button type="button" class="secondary-btn" id="diesel-cancel-btn">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Historial de compras -->
+            <div class="card table-card">
+                <div class="card-header">
+                    <h3>Historial de Compras de Diésel</h3>
+                </div>
+                <div class="table-container">
+                    <table id="diesel-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Galones</th>
+                                <th>Precio/Gal</th>
+                                <th>Total</th>
+                                <th>Notas</th>
+                                <th>Acc.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="diesel-table-body"></tbody>
+                    </table>
+                    <p id="diesel-empty" class="empty-msg hidden">No hay compras de diésel registradas.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== CLIENTS VIEW (ADMIN ONLY) ===== -->
+        <section id="view-clients" class="view hidden admin-only">
+            <div class="card form-card">
+                <div class="card-header">
+                    <h3><i data-lucide="user-plus"></i> Nuevo Cliente</h3>
+                </div>
+                <form id="client-form" novalidate>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label for="client-name">Nombre del Cliente *</label>
+                            <input type="text" id="client-name" required placeholder="Ej: Hacienda Los Andes">
+                            <span class="field-error" id="err-client-name"></span>
+                        </div>
+                    </div>
+                    <button type="submit" class="primary-btn">
+                        <i data-lucide="plus"></i> Agregar Cliente
+                    </button>
+                </form>
+            </div>
+            <div class="card table-card">
+                <div class="card-header"><h3>Catálogo de Clientes</h3></div>
+                <div class="table-container">
+                    <table id="clients-table">
+                        <thead>
+                            <tr><th>Nombre</th><th>Registrado</th><th>Acciones</th></tr>
+                        </thead>
+                        <tbody id="clients-table-body"></tbody>
+                    </table>
+                    <p id="clients-empty" class="empty-msg hidden">No hay clientes registrados.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== REPORTS VIEW (ADMIN ONLY) ===== -->
+        <section id="view-reports" class="view hidden admin-only">
+            <div class="card">
+                <div class="report-header-flex">
+                    <div class="view-header">
+                        <h2>Resumen Financiero</h2>
+                        <p>Corte de caja y rendimiento del tractor</p>
+                    </div>
+                    <div class="report-filters">
+                        <div class="tabs">
+                            <button class="filter-tab active" data-period="all">Todos</button>
+                            <button class="filter-tab" data-period="today">Hoy</button>
+                            <button class="filter-tab" data-period="month">Este Mes</button>
+                            <button class="filter-tab" data-period="custom">Rango</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="custom-range" class="custom-range hidden" style="margin-bottom: 2rem;">
+                    <div class="form-group">
+                        <label for="range-from">Desde</label>
+                        <input type="date" id="range-from">
+                    </div>
+                    <div class="form-group">
+                        <label for="range-to">Hasta</label>
+                        <input type="date" id="range-to">
+                    </div>
+                    <button id="apply-range-btn" class="primary-btn small">Aplicar Filtro</button>
+                </div>
+
+                <!-- Dashboard de Reporte Premium -->
+                <div class="report-summary-box">
+                    <div class="report-item">
+                        <label>Producción Total</label>
+                        <span class="value" id="report-revenue">$0.00</span>
+                    </div>
+                    <div class="report-item">
+                        <label>Horas Trabajadas</label>
+                        <span class="value" id="report-hours" style="color:var(--indigo);">0.0 h</span>
+                    </div>
+                    <div class="report-item">
+                        <label>Inversión Diésel</label>
+                        <span class="value" id="report-diesel" style="color:var(--red);">$0.00</span>
+                    </div>
+                    <div class="report-item main">
+                        <label>Ganancia Neta</label>
+                        <span class="value" id="report-profit">$0.00</span>
+                    </div>
+                </div>
+
+                <div class="report-summary-box" style="margin-top: -1rem; background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.2);">
+                    <div class="report-item">
+                        <label><i data-lucide="landmark" style="width:14px;height:14px;"></i> Dinero Ya en Admin</label>
+                        <span class="value" id="report-advances" style="color:var(--emerald);">$0.00</span>
+                    </div>
+                    <div class="report-item">
+                        <label><i data-lucide="wallet" style="width:14px;height:14px;"></i> Por Entregar (Operador)</label>
+                        <span class="value" id="report-cash" style="color:var(--amber);">$0.00</span>
+                    </div>
+                    <div class="report-item">
+                        <label><i data-lucide="alert-circle" style="width:14px;height:14px;"></i> Deudas Clientes</label>
+                        <span class="value" id="report-payments" style="color:var(--indigo);">$0.00</span>
+                    </div>
+                </div>
+
+                <div class="report-grid-tables">
+                    <div class="card table-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="list"></i> Registros de Trabajo</h3>
+                            <button class="secondary-btn small" id="export-report-btn">
+                                <i data-lucide="download"></i> Excel/CSV
+                            </button>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead><tr><th>Cliente</th><th>Fecha</th><th>Horas</th><th>Ingreso</th></tr></thead>
+                                <tbody id="report-jobs-body"></tbody>
+                                <tfoot id="report-jobs-foot"></tfoot>
+                            </table>
+                            <p id="report-empty" class="empty-msg hidden">Sin movimientos.</p>
+                        </div>
+                    </div>
+
+                    <div class="card table-card">
+                        <div class="card-header"><h3><i data-lucide="fuel"></i> Consumo Diésel</h3></div>
+                        <div class="table-container">
+                            <table>
+                                <thead><tr><th>Fecha</th><th>Galones</th><th>Total</th></tr></thead>
+                                <tbody id="report-diesel-body"></tbody>
+                                <tfoot id="report-diesel-foot"></tfoot>
+                            </table>
+                            <p id="report-diesel-empty" class="empty-msg hidden">Sin gastos.</p>
+                        </div>
+                    </div>
+
+                    <div class="card table-card">
+                        <div class="card-header"><h3><i data-lucide="hand-coins"></i> Entregas al Admin</h3></div>
+                        <div class="table-container">
+                            <table>
+                                <thead><tr><th>Fecha</th><th>Monto</th><th>Método</th></tr></thead>
+                                <tbody id="report-advances-body"></tbody>
+                                <tfoot id="report-advances-foot"></tfoot>
+                            </table>
+                            <p id="report-advances-empty" class="empty-msg hidden">Sin entregas.</p>
+                        </div>
+                    </div>
+
+                    <div class="card table-card">
+                        <div class="card-header"><h3><i data-lucide="dollar-sign"></i> Cobros de Deudas</h3></div>
+                        <div class="table-container">
+                            <table>
+                                <thead><tr><th>Fecha</th><th>Cliente</th><th>Monto</th></tr></thead>
+                                <tbody id="report-payments-body"></tbody>
+                                <tfoot id="report-payments-foot"></tfoot>
+                            </table>
+                            <p id="report-payments-empty" class="empty-msg hidden">Sin cobros.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== CIERRE DE CAJA VIEW (ADMIN ONLY) ===== -->
+        <section id="view-closure" class="view hidden admin-only">
+            <div class="card">
+                <div class="view-header">
+                    <h2>Cierre Mensual de Caja</h2>
+                    <p>Liquidaci&oacute;n del operador y bloqueo de periodo mensual</p>
+                </div>
+
+                <div class="card" id="monthly-close-card" style="margin-top:1.25rem;">
+                    <div class="card-header">
+                        <h3><i data-lucide="calendar-check-2"></i> Resumen de Cierre</h3>
+                        <span class="role-badge" id="closure-status-badge">BORRADOR</span>
+                    </div>
+
+                    <div class="form-grid" style="margin-bottom:1rem;">
+                        <div class="form-group">
+                            <label for="closure-month">Mes de Cierre</label>
+                            <input type="month" id="closure-month">
+                        </div>
+                        <div class="form-group">
+                            <label for="closure-reopen-reason">Motivo de Reapertura (opcional)</label>
+                            <input type="text" id="closure-reopen-reason" placeholder="Ej: ajuste de cobro fuera de fecha">
+                        </div>
+                    </div>
+
+                    <div class="report-summary-box" style="margin-bottom:1rem;">
+                        <div class="report-item">
+                            <label>Cobrado del Mes</label>
+                            <span class="value" id="closure-collected">$0.00</span>
+                        </div>
+                        <div class="report-item">
+                            <label>Gastos Diesel Mes</label>
+                            <span class="value" id="closure-expenses">$0.00</span>
+                        </div>
+                        <div class="report-item">
+                            <label>Adelantos del Mes</label>
+                            <span class="value" id="closure-advances">$0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="report-summary-box" style="background:rgba(97,114,243,0.05);border-color:rgba(97,114,243,0.2);">
+                        <div class="report-item">
+                            <label>Base Comision</label>
+                            <span class="value" id="closure-base">$0.00</span>
+                        </div>
+                        <div class="report-item">
+                            <label>Comision Operador (20%)</label>
+                            <span class="value" id="closure-commission" style="color:var(--indigo);">$0.00</span>
+                        </div>
+                        <div class="report-item">
+                            <label>Saldo a Entregar Admin</label>
+                            <span class="value" id="closure-balance" style="color:var(--amber);">$0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="form-actions" style="margin-top:1rem;">
+                        <button class="secondary-btn" id="closure-refresh-btn" type="button">
+                            <i data-lucide="refresh-cw"></i> Recalcular
+                        </button>
+                        <button class="primary-btn" id="closure-confirm-btn" type="button">
+                            <i data-lucide="shield-check"></i> Confirmar Cierre
+                        </button>
+                        <button class="secondary-btn" id="closure-reopen-btn" type="button">
+                            <i data-lucide="unlock"></i> Reabrir Mes
+                        </button>
+                    </div>
+                    <p id="closure-hint" style="margin-top:1rem;color:var(--text-3);">
+                        Al confirmar, se registra pago del operador, entrega final al admin y el mes queda bloqueado.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== DEUDORES VIEW (ADMIN ONLY) ===== -->
+        <section id="view-deudores" class="view hidden">
+            <div class="card table-card">
+                <div class="card-header"><h3><i data-lucide="alert-circle"></i> Deudas Pendientes</h3></div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Cliente</th><th>Total Trabajo</th><th>Pagado</th><th>Saldo Pendiente</th><th>Acción</th></tr></thead>
+                        <tbody id="deudores-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="report-header-flex">
+                    <div class="view-header">
+                        <h2>Cobros Realizados</h2>
+                        <p id="deudores-period-label">Este mes</p>
+                    </div>
+                    <div class="deudores-tabs">
+                        <button class="deudores-tab active" data-period="month">Este Mes</button>
+                        <button class="deudores-tab" data-period="all">Todos</button>
+                        <button class="deudores-tab" data-period="custom">Rango</button>
+                    </div>
+                </div>
+
+                <div id="deudores-custom-range" class="custom-range hidden" style="margin-bottom: 1.25rem;">
+                    <div class="form-group">
+                        <label for="deudores-range-from">Desde</label>
+                        <input type="date" id="deudores-range-from">
+                    </div>
+                    <div class="form-group">
+                        <label for="deudores-range-to">Hasta</label>
+                        <input type="date" id="deudores-range-to">
+                    </div>
+                    <button id="deudores-apply-range-btn" class="primary-btn small" type="button">Aplicar</button>
+                </div>
+
+                <div class="report-summary-box" style="margin-bottom: 1.25rem;">
+                    <div class="report-item main">
+                        <label>Total Cobrado</label>
+                        <span class="value" id="deudores-collected-total">$0.00</span>
+                    </div>
+                    <div class="report-item">
+                        <label>Cobros Registrados</label>
+                        <span class="value" id="deudores-collected-count" style="color:var(--indigo);">0</span>
+                    </div>
+                    <div class="report-item">
+                        <label>Clientes Cobrados</label>
+                        <span class="value" id="deudores-clients-count" style="color:var(--amber);">0</span>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Cliente</th>
+                                <th>Monto Cobrado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="deudores-payments-body"></tbody>
+                    </table>
+                    <p id="deudores-payments-empty" class="empty-msg hidden">No hay cobros en el periodo seleccionado.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== ADELANTOS VIEW ===== -->
+        <section id="view-adelantos" class="view hidden">
+            <div class="card form-card admin-only" style="margin-bottom:1rem;">
+                <div class="card-header"><h3><i data-lucide="plus-circle"></i> Registrar Entrega</h3></div>
+                <form id="admin-advance-form">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="admin-advance-date">Fecha</label>
+                            <input type="date" id="admin-advance-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="admin-advance-amount">Monto ($)</label>
+                            <input type="number" id="admin-advance-amount" min="0.01" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="admin-advance-method">Metodo</label>
+                            <select id="admin-advance-method">
+                                <option value="efectivo">Efectivo</option>
+                                <option value="transferencia">Transferencia</option>
+                                <option value="nequi">Nequi</option>
+                                <option value="daviplata">Daviplata</option>
+                                <option value="otro">Otro</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="admin-advance-notes">Notas</label>
+                            <input type="text" id="admin-advance-notes" placeholder="Opcional">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="primary-btn" id="admin-advance-submit-btn">
+                            <i data-lucide="save"></i> Guardar Entrega
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="card table-card">
+                <div class="card-header"><h3><i data-lucide="hand-coins"></i> Entregas al Administrador</h3></div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Fecha</th><th>Monto</th><th>Método</th><th>Acciones</th></tr></thead>
+                        <tbody id="advances-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== SETTINGS VIEW (ADMIN ONLY) ===== -->
+        <section id="view-settings" class="view hidden admin-only">
+            <div class="card form-card">
+                <div class="card-header"><h3><i data-lucide="settings"></i> Configuración del Sistema</h3></div>
+                <form id="settings-form">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Tarifa por Hora ($)</label>
+                            <input type="number" id="rate-per-hour" step="0.01">
+                            <span class="field-error" id="err-rate"></span>
+                        </div>
+                        <div class="form-group">
+                            <label>Precio Diésel por Galón ($)</label>
+                            <input type="number" id="diesel-default-price" step="0.01">
+                            <span class="field-error" id="err-diesel-price-cfg"></span>
+                        </div>
+                    </div>
+                    <button type="submit" class="primary-btn" id="settings-submit-btn">Guardar Cambios</button>
+                </form>
+            </div>
+
+            <div class="card form-card" style="margin-top: 2rem;">
+                <div class="card-header"><h3><i data-lucide="lock"></i> Cambiar Contraseña</h3></div>
+                <form id="change-password-form">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Nueva Contraseña</label>
+                            <input type="password" id="new-password">
+                            <span class="field-error" id="err-new-password"></span>
+                        </div>
+                        <div class="form-group">
+                            <label>Confirmar Contraseña</label>
+                            <input type="password" id="confirm-password">
+                            <span class="field-error" id="err-confirm-password"></span>
+                        </div>
+                    </div>
+                    <button type="submit" class="primary-btn">Actualizar Contraseña</button>
+                </form>
+            </div>
+        </section>
+    </main>
+</div>
+
+<!-- Modal para registrar cobro de deuda -->
+<div id="payment-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+        <h3>Registrar Cobro de Deuda</h3>
+        <p id="payment-client-name" style="margin-bottom: 1rem; font-weight: 600;"></p>
+        <form id="payment-form">
+            <input type="hidden" id="payment-job-id">
+            <div class="form-group">
+                <label>Monto a Cobrar ($)</label>
+                <input type="number" id="payment-amount" step="0.01" required>
+                <p id="payment-max-info" style="font-size: 0.8rem; color: var(--text-3);"></p>
+            </div>
+            <button type="submit" class="primary-btn full-width">Confirmar Cobro</button>
+            <button type="button" class="secondary-btn full-width" id="cancel-payment-btn" style="margin-top: 0.5rem;">Cancelar</button>
+        </form>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
