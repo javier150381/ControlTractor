@@ -117,6 +117,7 @@ async function enterApp(username, userId, role, display) {
     }
 
     $$('.admin-only').forEach(el => el.style.display = role === 'admin' ? '' : 'none');
+    $$('.operator-only').forEach(el => el.style.display = role === 'operator' ? '' : 'none');
 
     $('login-screen').classList.add('hidden');
     $('app').classList.remove('hidden');
