@@ -811,7 +811,31 @@ async function confirmMonthlyClosure() {
         confirmed_at: new Date().toISOString()
     };
     const { error } = await sb.from('monthly_closures').upsert([payload]);
-    if (!error) { showNotification('Cierre confirmado', 'success'); refreshMonthlyClosurePanel(); }
+    if (!error) { 
+        showNotification('Cierre confirmado exitosamente', 'success'); 
+        await loadAdvances(); // Para ver la entrega final registrada
+        await refreshMonthlyClosurePanel(); 
+    }
+}
+
+async function reopenMonthlyClosure() {
+    if (STATE.role !== 'admin') return;
+    const monthStr = getClosureMonthValue();
+    const calc = getMonthBounds(monthStr);
+    if (!calc) return;
+
+    if (!confirm('¿Deseas reabrir este mes? Se anulará el cierre y podrás hacer cambios.')) return;
+
+    const { error } = await sb.from('monthly_closures')
+        .update({ status: 'anulado', confirmed_at: null })
+        .eq('operator_user_id', OPERATOR_USER_ID)
+        .eq('period_year', calc.year)
+        .eq('period_month', calc.month);
+
+    if (!error) {
+        showNotification('Cierre reabierto. Ya puedes editar datos del mes.', 'warning');
+        await refreshMonthlyClosurePanel();
+    }
 }
 
 // --- UTILS ---
@@ -850,5 +874,11 @@ $$('.filter-tab').forEach(tab => {
 $('apply-range-btn')?.addEventListener('click', () => { STATE.reportFrom = $('range-from').value; STATE.reportTo = $('range-to').value; renderReport(); });
 
 $('closure-month')?.addEventListener('change', refreshMonthlyClosurePanel);
-$('closure-refresh-btn')?.addEventListener('click', refreshMonthlyClosurePanel);
+$('closure-refresh-btn')?.addEventListener('click', async () => {
+    // Forzar recarga de datos antes de recalcular
+    await loadJobs(); await loadDiesel(); await loadAdvances(); await loadPayments();
+    await refreshMonthlyClosurePanel();
+    showNotification('Datos actualizados', 'success');
+});
 $('closure-confirm-btn')?.addEventListener('click', confirmMonthlyClosure);
+$('closure-reopen-btn')?.addEventListener('click', reopenMonthlyClosure);
