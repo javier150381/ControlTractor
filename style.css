@@ -90,15 +90,22 @@ h1,h2,h3,.logo{font-family:'Outfit',sans-serif;}
 .app-container{display:flex;min-height:100vh;}
 
 /* Sidebar */
-.sidebar{
-    width:260px;background:var(--sidebar-bg);
-    border-right:1px solid var(--border);
-    padding:1.75rem 1.25rem;
-    display:flex;flex-direction:column;gap:0;
-    position:fixed;height:100vh;overflow-y:auto;
+.sidebar {
+    width: 260px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    padding: 1.5rem 1rem 3rem; /* Aumentado el padding inferior */
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: fixed;
+    height: 100vh;
+    overflow-y: auto;
     transition: transform 0.3s ease;
     z-index: 1000;
 }
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
 
 /* Mobile Toggle Button */
 .mobile-toggle {
